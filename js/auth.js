@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (popupName) popupName.textContent = resolvedName;
 
     if (profile?.avatar_url) {
-      ["user-avatar", "popup-user-avatar", "edit-profile-avatar-preview"].forEach(id => {
+      ["user-avatar", "popup-user-avatar", "edit-profile-avatar-preview", "mobile-welcome-avatar"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.backgroundImage = `url('${profile.avatar_url}')`;
       });
@@ -183,6 +183,10 @@ function openProfileSubpage(pageName) {
   const popup = document.getElementById("profile-popup");
   if (popup) popup.classList.remove("active");
 
+  if (typeof closeMobileSidebar === "function") {
+    closeMobileSidebar();
+  }
+
   document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
   const target = document.getElementById("screen-" + pageName);
   if (target) target.classList.add("active");
@@ -275,7 +279,7 @@ async function uploadProfileAvatar(event) {
     return;
   }
 
-  ["user-avatar", "popup-user-avatar", "edit-profile-avatar-preview"].forEach(id => {
+  ["user-avatar", "popup-user-avatar", "edit-profile-avatar-preview", "mobile-welcome-avatar"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.backgroundImage = `url('${avatarUrl}')`;
   });

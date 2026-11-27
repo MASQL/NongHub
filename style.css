@@ -24,6 +24,7 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
 }
@@ -53,7 +54,7 @@ body {
 }
 
 .welcome-logo-img {
-  height: 64px;
+  height: 60px;
 }
 
 /* ================= AVATAR BULAT ASSET ================= */
@@ -72,13 +73,27 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
+  padding: 20px 16px;
   background-color: var(--bg-main);
+  overflow-y: auto;
+}
+
+.auth-welcome-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.auth-welcome-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 6px;
 }
 
 .auth-page .brand-logo {
-  margin-bottom: 24px;
+  margin-bottom: 6px;
   font-size: 2.2rem;
 }
 
@@ -86,7 +101,7 @@ body {
   background-color: var(--bg-card);
   width: 100%;
   max-width: 380px;
-  padding: 36px 32px;
+  padding: 32px 28px;
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
@@ -95,7 +110,7 @@ body {
   text-align: center;
   color: var(--cyan);
   font-size: 1.5rem;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .form-group {
@@ -137,7 +152,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 14px 0 24px;
+  margin: 14px 0 22px;
   font-size: 0.72rem;
 }
 
@@ -195,8 +210,35 @@ body {
 .app-container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   flex-direction: row;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.mobile-sidebar-header {
+  display: none;
+}
+
+.mobile-top-nav {
+  display: none;
+}
+
+.mobile-menu-btn {
+  display: none;
+}
+
+.mobile-open-drawer-cta {
+  display: none;
+}
+
+.mobile-pill-label {
+  display: none;
 }
 
 .sidebar {
@@ -207,11 +249,14 @@ body {
   justify-content: space-between;
   border-right: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  position: relative;
+  z-index: 20;
 }
 
 .sidebar-top {
   padding: 20px 16px;
   overflow-y: auto;
+  flex: 1;
 }
 
 .nav-item {
@@ -225,6 +270,12 @@ body {
   font-size: 0.9rem;
   transition: all 0.2s;
   user-select: none;
+}
+
+.nav-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-item:hover {
@@ -292,6 +343,7 @@ body {
   gap: 12px;
   border-top: 1px solid var(--border-subtle);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .profile-footer .avatar-circle {
@@ -333,10 +385,12 @@ body {
 /* ================= CONTENT AREA KANAN ================= */
 .main-content {
   flex: 1;
+  min-width: 0;
   background-color: var(--bg-main);
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
 }
@@ -344,6 +398,7 @@ body {
 .screen-section {
   display: none;
   flex: 1;
+  min-height: 0;
   flex-direction: column;
   height: 100%;
 }
@@ -357,6 +412,14 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.welcome-center-box {
+  margin: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 #screen-welcome p {
@@ -375,12 +438,15 @@ body {
   justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  gap: 12px;
 }
 
 .chat-header-left {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  flex: 1;
 }
 
 .chat-header-left .avatar-circle {
@@ -388,9 +454,19 @@ body {
   height: 38px;
 }
 
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .chat-header-left h3 {
   font-size: 1.15rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .channel-badge-code {
@@ -400,6 +476,7 @@ body {
   padding: 3px 8px;
   border-radius: 4px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .chat-header-actions {
@@ -407,6 +484,7 @@ body {
   align-items: center;
   gap: 20px;
   color: #d0d0dc;
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -418,6 +496,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: color 0.2s;
+  flex-shrink: 0;
 }
 
 .icon-btn:hover {
@@ -426,17 +505,22 @@ body {
 
 .chat-messages {
   flex: 1;
-  padding: 24px 32px;
+  min-height: 0;
+  padding: 36px 32px 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .empty-state {
   margin: auto;
+  padding: 0 20px;
   color: var(--text-muted);
   font-size: 0.95rem;
   text-align: center;
+  line-height: 1.5;
 }
 
 .msg-bubble-row {
@@ -444,6 +528,7 @@ body {
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 16px;
+  position: relative;
 }
 
 .msg-bubble-row .avatar-circle {
@@ -456,6 +541,77 @@ body {
   padding: 10px 14px;
   border-radius: 8px;
   max-width: 70%;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.msg-content-box.pressing {
+  background-color: #2b2b3d;
+  transform: scale(0.985);
+}
+
+.msg-content-box.popup-open {
+  outline: 1.5px solid var(--cyan);
+  background-color: #28283a;
+}
+
+/* POP-UP KECIL TEPAT DI ATAS GELEMBUNG CHAT (SALIN TEXT & REPLY/BALAS) */
+.msg-action-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background-color: #191926;
+  border: 1px solid rgba(0, 184, 212, 0.45);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  z-index: 60;
+  white-space: nowrap;
+  animation: msgPopupFade 0.14s ease-out;
+}
+
+@keyframes msgPopupFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.msg-popup-btn {
+  background: none;
+  border: none;
+  color: #f0f0f8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.msg-popup-btn:hover {
+  background-color: rgba(0, 184, 212, 0.18);
+  color: var(--cyan);
+}
+
+.msg-popup-divider {
+  width: 1px;
+  height: 16px;
+  background-color: var(--border-subtle);
 }
 
 .msg-meta {
@@ -469,25 +625,67 @@ body {
   font-size: 0.9rem;
   color: #f0f0f5;
   line-height: 1.4;
+  word-break: break-word;
+}
+
+.msg-reply-tag {
+  color: var(--cyan);
+  font-weight: 600;
 }
 
 .chat-input-wrapper {
-  padding: 16px 32px 24px;
+  padding: 12px 32px 24px;
   flex-shrink: 0;
+}
+
+/* BAR INDIKATOR REPLY DI ATAS INPUT */
+.reply-preview-bar {
+  background-color: var(--bg-card);
+  border-left: 3px solid var(--cyan);
+  border-top: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 8px 8px 0 0;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.reply-preview-bar + .chat-input-box {
+  border-radius: 0 0 8px 8px;
+}
+
+.reply-cancel-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+
+.reply-cancel-btn:hover {
+  color: #ff5c5c;
 }
 
 .chat-input-box {
   background-color: #ffffff;
   border-radius: 8px;
   height: 46px;
-  padding: 0 16px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .chat-input-box input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   font-size: 0.9rem;
@@ -504,6 +702,11 @@ body {
   align-items: center;
   gap: 12px;
   color: #222230;
+  flex-shrink: 0;
+}
+
+.btn-send-msg {
+  padding: 4px;
 }
 
 /* PESAN MASUK & TAMBAH CHANNEL */
@@ -525,10 +728,16 @@ body {
   flex-shrink: 0;
 }
 
+.search-toolbar-icons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .search-input-container {
   background-color: #ffffff;
   border-radius: 6px;
-  height: 38px;
+  height: 40px;
   width: 100%;
   max-width: 440px;
   padding: 0 12px;
@@ -540,6 +749,7 @@ body {
 
 .search-input-container input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   font-size: 0.88rem;
@@ -554,7 +764,7 @@ body {
   width: 100%;
   max-width: 760px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -581,6 +791,7 @@ body {
   align-items: center;
   gap: 14px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .inbox-card-left .avatar-circle {
@@ -654,10 +865,6 @@ body {
 }
 
 /* ================= PROFILE POPUP MENU ================= */
-.sidebar {
-  position: relative;
-}
-
 .profile-popup {
   display: none;
   position: absolute;
@@ -690,9 +897,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px;
   border-radius: 6px;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: #e0e0ea;
   background: none;
   border: none;
@@ -759,7 +966,8 @@ body {
 
 /* ================= CHAT MEDIA & FILE ATTACHMENT ================= */
 .chat-attached-image {
-  max-width: 280px;
+  max-width: 100%;
+  width: 260px;
   max-height: 240px;
   border-radius: 6px;
   margin-top: 6px;
@@ -886,7 +1094,6 @@ body {
   border-color: var(--magenta);
 }
 
-/* Kondisi Speaking (Mic ON / Terdeteksi Suara) */
 .participant-card.speaking {
   transform: scale(1.045);
   box-shadow: 0 0 18px rgba(0, 229, 255, 0.18);
@@ -897,7 +1104,6 @@ body {
   box-shadow: 0 0 18px rgba(224, 0, 224, 0.22);
 }
 
-/* Wave Visual untuk Voice Call */
 .voice-wave-visual {
   display: flex;
   align-items: center;
@@ -905,7 +1111,6 @@ body {
   opacity: 0.85;
 }
 
-/* Video Stream untuk Video Call */
 .participant-video {
   width: 100%;
   height: 100%;
@@ -913,7 +1118,6 @@ body {
   background-color: #0e0e14;
 }
 
-/* Info Kiri Bawah Kartu Peserta */
 .participant-info {
   position: absolute;
   bottom: 10px;
@@ -943,7 +1147,6 @@ body {
   height: 6px;
 }
 
-/* Ikon Mic Pojok Kanan Bawah Kartu (Merah saat diam, Hijau saat bicara) */
 .participant-mic-badge {
   position: absolute;
   bottom: 10px;
@@ -958,7 +1161,6 @@ body {
   transform: scale(1.1);
 }
 
-/* Bar Kontrol Bawah */
 .call-bottom-bar {
   height: 68px;
   background-color: #16161f;
@@ -1077,6 +1279,7 @@ body {
   align-items: center;
   padding: 24px 32px;
   text-align: center;
+  overflow-y: auto;
 }
 
 .bio-section-label {
@@ -1109,9 +1312,9 @@ body {
   background-color: var(--cyan);
   color: #12121a;
   border: none;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border-radius: 6px;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1148,6 +1351,7 @@ body {
   gap: 14px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 .subpage-header h3 {
@@ -1162,12 +1366,14 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   max-width: 520px;
+  overflow-y: auto;
 }
 
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 14px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -1205,6 +1411,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-width: 0;
 }
 
 .channel-online-subtext {
@@ -1221,4 +1428,311 @@ body {
 .channel-online-subtext.typing-active {
   color: var(--cyan);
   font-weight: 600;
+}
+
+/* =====================================================================
+   RESPONSIVE LAYOUT UNTUK PERANGKAT MOBILE & TABLET (<= 768px)
+   ===================================================================== */
+@media (max-width: 768px) {
+  /* Tampilkan tombol menu hamburger & bar navigasi atas mobile */
+  .mobile-menu-btn {
+    display: flex;
+    padding: 4px;
+  }
+
+  .mobile-top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 58px;
+    padding: 0 16px;
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .mobile-nav-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .mobile-header-avatar {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    border: 1.5px solid var(--cyan);
+  }
+
+  .mobile-open-drawer-cta {
+    display: inline-block;
+    margin-top: 22px;
+    padding: 10px 20px;
+    background-color: var(--cyan);
+    color: #12121a;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Sidebar berubah menjadi Slide-Over Drawer dari Kiri */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 275px;
+    max-width: 82vw;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.65);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.62);
+    z-index: 150;
+  }
+
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  .mobile-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .mobile-sidebar-logo {
+    height: 28px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .profile-popup {
+    width: calc(100% - 24px);
+    left: 12px;
+    bottom: 74px;
+  }
+
+  /* Header Chat Mobile */
+  .chat-header {
+    height: 60px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .chat-header-left {
+    gap: 8px;
+  }
+
+  .chat-header-left .avatar-circle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .chat-title-row {
+    gap: 6px;
+  }
+
+  .chat-header-left h3 {
+    font-size: 0.98rem;
+  }
+
+  .channel-badge-code {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  .channel-online-subtext {
+    font-size: 0.68rem;
+    max-width: 170px;
+  }
+
+  .chat-header-actions {
+    gap: 12px;
+  }
+
+  /* Area Chat & Bubble Mobile */
+  .chat-messages {
+    padding: 16px 12px 12px;
+  }
+
+  .msg-bubble-row {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .msg-bubble-row .avatar-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .msg-content-box {
+    max-width: 84%;
+    padding: 9px 12px;
+  }
+
+  .chat-attached-image {
+    width: 210px;
+    max-height: 200px;
+  }
+
+  /* Kotak Input Pesan & Upload File Mobile (Anti Terpotong & Anti Auto-Zoom) */
+  .chat-input-wrapper {
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    background-color: var(--bg-main);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .chat-input-box {
+    height: 44px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .chat-input-box input {
+    font-size: 16px;
+  }
+
+  .input-actions {
+    gap: 8px;
+  }
+
+  /* Halaman Pesan Masuk & Buat/Gabung Channel Mobile */
+  .top-bar-minimal {
+    height: 56px;
+    padding: 0 14px;
+    justify-content: space-between;
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .search-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px 18px;
+  }
+
+  .search-input-container {
+    max-width: 100%;
+    height: 42px;
+  }
+
+  .search-input-container input {
+    font-size: 16px;
+  }
+
+  .search-toolbar-icons {
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .explore-action-pill {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    padding: 9px 16px;
+    border-radius: 8px;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .explore-action-pill.primary {
+    background-color: var(--cyan);
+    color: #12121a;
+    border-color: var(--cyan);
+  }
+
+  .mobile-pill-label {
+    display: inline;
+  }
+
+  .desktop-only-icon {
+    display: none;
+  }
+
+  .inbox-list {
+    padding: 0 14px 16px;
+    gap: 10px;
+  }
+
+  .inbox-card {
+    padding: 12px 14px;
+  }
+
+  /* Subpages Setting, Edit Profile & Bio Channel Mobile */
+  .subpage-header {
+    padding: 14px 16px;
+  }
+
+  .subpage-card {
+    margin: 14px;
+    padding: 18px 16px;
+    max-width: 100%;
+  }
+
+  .edit-avatar-row {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .subpage-input,
+  .bio-textarea,
+  .form-group input[type="text"],
+  .form-group input[type="password"] {
+    font-size: 16px;
+  }
+
+  .bio-top-bar {
+    padding: 14px 16px 8px;
+  }
+
+  .bio-body-content {
+    padding: 18px 16px;
+  }
+
+  /* Halaman Voice & Video Call Mobile */
+  .call-room-header {
+    padding: 16px 14px 8px;
+  }
+
+  .call-room-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .call-room-body {
+    padding: 12px 14px;
+  }
+
+  .call-participants-grid {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 12px;
+  }
+
+  .participant-card {
+    height: 155px;
+  }
+
+  .login-card {
+    padding: 26px 20px;
+  }
 }

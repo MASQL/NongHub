@@ -2,15 +2,28 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>NongkrongHub</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app-container">
-    <!-- SIDEBAR KIRI -->
-    <aside class="sidebar">
+    <!-- BACKDROP MOBILE SIDEBAR -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+    <!-- SIDEBAR KIRI (DRAWER DI MOBILE) -->
+    <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-top">
+        <div class="mobile-sidebar-header">
+          <img src="logo.png" alt="NongHub" class="mobile-sidebar-logo" />
+          <button type="button" class="icon-btn mobile-close-btn" title="Tutup Menu" onclick="closeMobileSidebar()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
         <!-- Menu Pesan Masuk -->
         <div class="nav-item" id="nav-inbox" onclick="switchScreen('inbox')">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -101,9 +114,24 @@
 
       <!-- 1. HALAMAN SETELAH LOGIN (WELCOME) -->
       <div id="screen-welcome" class="screen-section active">
-        <p>Welcome to</p>
-        <div class="brand-logo">
-          <img src="logo.png" alt="NongHub Logo" class="brand-logo-img" />
+        <div class="mobile-top-nav">
+          <button type="button" class="icon-btn mobile-menu-btn" title="Buka Menu" onclick="openMobileSidebar()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <span class="mobile-nav-title">NongkrongHub</span>
+          <div class="avatar-circle mobile-header-avatar" id="mobile-welcome-avatar" onclick="openMobileSidebar()"></div>
+        </div>
+
+        <div class="welcome-center-box">
+          <p>Welcome to</p>
+          <div class="brand-logo">
+            <img src="logo.png" alt="NongHub Logo" class="brand-logo-img" />
+          </div>
+          <button type="button" class="mobile-open-drawer-cta" onclick="openMobileSidebar()">Buka Daftar Channel & Profil</button>
         </div>
       </div>
 
@@ -111,9 +139,16 @@
       <div id="screen-chat" class="screen-section">
         <header class="chat-header">
           <div class="chat-header-left">
+            <button type="button" class="icon-btn mobile-menu-btn" title="Daftar Channel" onclick="openMobileSidebar()">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
             <div class="avatar-circle" id="active-channel-avatar"></div>
             <div class="chat-title-stack">
-              <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="chat-title-row">
                 <h3 id="active-channel-title">Channel 1</h3>
                 <span class="channel-badge-code" id="active-channel-code">NH-1001</span>
               </div>
@@ -165,6 +200,12 @@
 
         <!-- Kotak Input Pesan -->
         <div class="chat-input-wrapper">
+          <!-- Indikator Mode Reply -->
+          <div class="reply-preview-bar" id="reply-preview-bar" style="display: none;">
+            <span id="reply-preview-label">Reply (username)</span>
+            <button type="button" class="reply-cancel-btn" title="Batal Reply" onclick="cancelReply()">&times;</button>
+          </div>
+
           <form class="chat-input-box" id="chat-form">
             <input type="text" id="chat-input" placeholder="Apa yang ingin kamu bahas?" autocomplete="off" />
 
@@ -190,6 +231,14 @@
                   <line x1="8" y1="12" x2="16" y2="12"></line>
                 </svg>
               </button>
+
+              <!-- Tombol Kirim Pesan (Memudahkan kirim di Mobile & Desktop) -->
+              <button type="submit" class="icon-btn btn-send-msg" title="Kirim Pesan">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00b8d4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
             </div>
           </form>
         </div>
@@ -198,6 +247,14 @@
       <!-- 3. HALAMAN PESAN MASUK -->
       <div id="screen-inbox" class="screen-section">
         <div class="top-bar-minimal">
+          <button type="button" class="icon-btn mobile-menu-btn" title="Buka Menu" onclick="openMobileSidebar()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <span class="mobile-nav-title">Pesan Masuk</span>
           <button class="icon-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="1.8"></circle>
@@ -208,15 +265,6 @@
         </div>
 
         <div class="search-toolbar">
-          <button class="icon-btn" title="Tambah Teman">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="8.5" cy="7" r="4"></circle>
-              <line x1="20" y1="8" x2="20" y2="14"></line>
-              <line x1="23" y1="11" x2="17" y2="11"></line>
-            </svg>
-          </button>
-
           <div class="search-input-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#12121a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
@@ -225,18 +273,29 @@
             <input type="text" id="search-inbox" placeholder="Cari Pesan" onkeyup="filterInbox()" />
           </div>
 
-          <button class="icon-btn" title="Pesan Belum Dibaca">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="#d0d0dc">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-              <polyline points="22,6 12,13 2,6" fill="none" stroke="#12121a" stroke-width="2"></polyline>
-            </svg>
-          </button>
+          <div class="search-toolbar-icons">
+            <button class="icon-btn" title="Tambah Teman">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="20" y1="8" x2="20" y2="14"></line>
+                <line x1="23" y1="11" x2="17" y2="11"></line>
+              </svg>
+            </button>
 
-          <button class="icon-btn" title="Favorit">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-          </button>
+            <button class="icon-btn" title="Pesan Belum Dibaca">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#d0d0dc">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6" fill="none" stroke="#12121a" stroke-width="2"></polyline>
+              </svg>
+            </button>
+
+            <button class="icon-btn" title="Favorit">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="inbox-list" id="inbox-list"></div>
@@ -244,51 +303,65 @@
 
       <!-- 4. HALAMAN TAMBAH / JELAJAHI CHANNEL -->
       <div id="screen-explore" class="screen-section">
-        <div class="top-bar-minimal"></div>
-
-        <div class="search-toolbar">
-          <button class="icon-btn" title="Cari & Gabung Channel" onclick="searchAndJoinChannel()">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        <div class="top-bar-minimal">
+          <button type="button" class="icon-btn mobile-menu-btn" title="Buka Menu" onclick="openMobileSidebar()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
+          <span class="mobile-nav-title">Buat / Gabung Channel</span>
+          <div style="width: 22px;"></div>
+        </div>
 
+        <div class="search-toolbar">
           <div class="search-input-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#12121a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <input type="text" id="channel-action-input" placeholder="Jelajahi Channel (Masukkan Nama / Kode Channel)" />
+            <input type="text" id="channel-action-input" placeholder="Masukkan Nama / Kode Channel" />
           </div>
 
-          <button class="icon-btn" title="Buat Channel Baru" onclick="createNewChannel()">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="16"></line>
-              <line x1="8" y1="12" x2="16" y2="12"></line>
-            </svg>
-          </button>
+          <div class="search-toolbar-icons">
+            <button class="icon-btn explore-action-pill" title="Cari & Gabung Channel" onclick="searchAndJoinChannel()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <span class="mobile-pill-label">Gabung</span>
+            </button>
 
-          <button class="icon-btn" title="Channel Populer">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-          </button>
+            <button class="icon-btn explore-action-pill primary" title="Buat Channel Baru" onclick="createNewChannel()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+              <span class="mobile-pill-label">Buat</span>
+            </button>
 
-          <button class="icon-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5" r="1.8"></circle>
-              <circle cx="12" cy="12" r="1.8"></circle>
-              <circle cx="12" cy="19" r="1.8"></circle>
-            </svg>
-          </button>
+            <button class="icon-btn desktop-only-icon" title="Channel Populer">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </button>
+
+            <button class="icon-btn desktop-only-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5" r="1.8"></circle>
+                <circle cx="12" cy="12" r="1.8"></circle>
+                <circle cx="12" cy="19" r="1.8"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="empty-state" id="explore-status-text">
           No Channel<br><br>
-          <small>Ketik nama lalu klik <b>(+)</b> untuk buat channel baru, atau masukkan kode (misal: <b>NH-1001</b>) lalu klik ikon <b>Globe</b> untuk bergabung.</small>
+          <small>Ketik nama lalu klik <b>(+) Buat</b> untuk membuat channel baru, atau masukkan kode (misal: <b>NH-1001</b>) lalu klik ikon <b>Globe / Gabung</b> untuk bergabung.</small>
         </div>
       </div>
 
@@ -378,6 +451,13 @@
       <!-- 7. HALAMAN SETTING -->
       <div id="screen-settings" class="screen-section">
         <div class="subpage-header">
+          <button type="button" class="icon-btn mobile-menu-btn" title="Buka Menu" onclick="openMobileSidebar()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="2" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <button type="button" class="icon-btn" onclick="switchScreen('welcome')">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -393,7 +473,7 @@
               <strong>Status Aktivitas</strong>
               <p>Atur tampilan status online atau offline kamu</p>
             </div>
-            <select id="setting-status-select" class="subpage-input" style="width: 140px;" onchange="changeUserStatus(this.value)">
+            <select id="setting-status-select" class="subpage-input" style="width: 130px;" onchange="changeUserStatus(this.value)">
               <option value="online">Online</option>
               <option value="offline">Offline</option>
             </select>
@@ -412,6 +492,13 @@
       <!-- 8. HALAMAN EDIT PROFILE -->
       <div id="screen-edit-profile" class="screen-section">
         <div class="subpage-header">
+          <button type="button" class="icon-btn mobile-menu-btn" title="Buka Menu" onclick="openMobileSidebar()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="2" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <button type="button" class="icon-btn" onclick="switchScreen('welcome')">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d0d0dc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -436,7 +523,7 @@
             <input type="text" id="edit-username-input" class="subpage-input" placeholder="Masukkan username baru" />
           </div>
 
-          <button type="button" class="btn-save-bio" style="margin-top: 14px;" onclick="saveEditedProfile()">Simpan Perubahan Profil</button>
+          <button type="button" class="btn-save-bio" style="margin-top: 14px; width: 100%;" onclick="saveEditedProfile()">Simpan Perubahan Profil</button>
         </div>
       </div>
 

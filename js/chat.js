@@ -14,6 +14,11 @@ let currentUsername = "";
 let typingTimeout = null;
 let isCurrentlyTyping = false;
 
+// State untuk fitur Long-Press Pop-up & Reply
+let replyingToUsername = null;
+let activeMessagePopupEl = null;
+let activeMessageBoxEl = null;
+
 const userCache = {};
 const userAvatarCache = {}; // { userId: avatar_url }
 const channelCache = {}; // { channelId: { name, code, avatar_url, bio, created_by } }
@@ -35,6 +40,23 @@ const USER_NAME_COLORS = [
   "#1dd1a1", // Tosca
   "#ff793f"  // Jingga Tua
 ];
+
+// Kontrol Drawer Sidebar Mobile
+function openMobileSidebar() {
+  const sidebar = document.getElementById("app-sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (sidebar) sidebar.classList.add("mobile-open");
+  if (backdrop) backdrop.classList.add("active");
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("app-sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  const popup = document.getElementById("profile-popup");
+  if (sidebar) sidebar.classList.remove("mobile-open");
+  if (backdrop) backdrop.classList.remove("active");
+  if (popup) popup.classList.remove("active");
+}
 
 function getUserColor(username) {
   if (!username) return "#00b8d4";
@@ -62,6 +84,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   injectNavInboxDot();
   renderInboxNotifications();
   setupTypingListener();
+  setupGlobalMessagePopupDismiss();
 
   await loadUserChannels(currentUserId);
   subscribeGlobalInbox(currentUserId);
@@ -74,6 +97,178 @@ window.addEventListener("beforeunload", () => {
     channelPresenceSubscription.untrack();
   }
 });
+
+// Tutup pop-up aksi pesan jika klik/sentuh di luar area pop-up
+function setupGlobalMessagePopupDismiss() {
+  document.addEventListener("mousedown", (e) => {
+    if (activeMessagePopupEl && !activeMessagePopupEl.contains(e.target)) {
+      closeMessageActionPopup();
+    }
+  });
+  document.addEventListener("touchstart", (e) => {
+    if (activeMessagePopupEl && !activeMessagePopupEl.contains(e.target)) {
+      closeMessageActionPopup();
+    }
+  }, { passive: true });
+}
+
+function closeMessageActionPopup() {
+  if (activeMessagePopupEl) {
+    activeMessagePopupEl.remove();
+    activeMessagePopupEl = null;
+  }
+  if (activeMessageBoxEl) {
+    activeMessageBoxEl.classList.remove("popup-open", "pressing");
+    activeMessageBoxEl = null;
+  }
+}
+
+function getCopyableMessageText(rawText) {
+  if (rawText.startsWith("[IMG]|")) {
+    const parts = rawText.split("|");
+    return parts[1] || rawText;
+  }
+  if (rawText.startsWith("[FILE]|")) {
+    const parts = rawText.split("|");
+    return `${parts[2] || "File"} (${parts[1] || ""})`;
+  }
+  return rawText;
+}
+
+function showMessageActionPopup(boxEl, senderName, rawText) {
+  closeMessageActionPopup();
+
+  const popup = document.createElement("div");
+  popup.className = "msg-action-popup";
+
+  // 1. Tombol Salin text
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "msg-popup-btn";
+  copyBtn.innerHTML = `
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+    <span>Salin text</span>
+  `;
+  copyBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const textToCopy = getCopyableMessageText(rawText);
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+    } catch (err) {
+      const tempInput = document.createElement("textarea");
+      tempInput.value = textToCopy;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      tempInput.remove();
+    }
+    copyBtn.innerHTML = `<span style="color: #2ed573;">✓ Tersalin</span>`;
+    setTimeout(() => closeMessageActionPopup(), 550);
+  };
+
+  const divider = document.createElement("div");
+  divider.className = "msg-popup-divider";
+
+  // 2. Tombol Reply / Balas
+  const replyBtn = document.createElement("button");
+  replyBtn.type = "button";
+  replyBtn.className = "msg-popup-btn";
+  replyBtn.innerHTML = `
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="9 17 4 12 9 7"></polyline>
+      <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+    </svg>
+    <span>Reply/Balas</span>
+  `;
+  replyBtn.onclick = (e) => {
+    e.stopPropagation();
+    closeMessageActionPopup();
+    startReplyToUser(senderName);
+  };
+
+  popup.appendChild(copyBtn);
+  popup.appendChild(divider);
+  popup.appendChild(replyBtn);
+
+  boxEl.classList.add("popup-open");
+  boxEl.appendChild(popup);
+  activeMessagePopupEl = popup;
+  activeMessageBoxEl = boxEl;
+}
+
+// Pasang trigger tekan lama (tahan klik mouse di browser / tahan sentuh di HP)
+function attachLongPressHandlers(boxEl, senderName, rawText) {
+  let pressTimer = null;
+  const LONG_PRESS_DURATION = 450; // 450ms tekan lama
+
+  const startPress = (e) => {
+    if (e.type === "mousedown" && e.button !== 0) return;
+    if (e.target.closest(".msg-action-popup")) return;
+
+    boxEl.classList.add("pressing");
+    pressTimer = setTimeout(() => {
+      boxEl.classList.remove("pressing");
+      showMessageActionPopup(boxEl, senderName, rawText);
+    }, LONG_PRESS_DURATION);
+  };
+
+  const cancelPress = () => {
+    boxEl.classList.remove("pressing");
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  };
+
+  // Event Desktop (Browser Mouse)
+  boxEl.addEventListener("mousedown", startPress);
+  boxEl.addEventListener("mouseup", cancelPress);
+  boxEl.addEventListener("mouseleave", cancelPress);
+
+  // Event Mobile (Touchscreen)
+  boxEl.addEventListener("touchstart", startPress, { passive: true });
+  boxEl.addEventListener("touchend", cancelPress);
+  boxEl.addEventListener("touchmove", cancelPress, { passive: true });
+  boxEl.addEventListener("touchcancel", cancelPress);
+
+  // Cegah menu klik kanan bawaan browser/HP saat tekan lama pada bubble chat
+  boxEl.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+  });
+}
+
+function startReplyToUser(targetUsername) {
+  replyingToUsername = targetUsername;
+  const bar = document.getElementById("reply-preview-bar");
+  const label = document.getElementById("reply-preview-label");
+  const input = document.getElementById("chat-input");
+
+  if (bar && label) {
+    label.textContent = `Reply (${targetUsername})`;
+    bar.style.display = "flex";
+  }
+
+  if (input) {
+    input.placeholder = `Balas pesan ${targetUsername}...`;
+    input.focus();
+  }
+}
+
+function cancelReply() {
+  replyingToUsername = null;
+  const bar = document.getElementById("reply-preview-bar");
+  const input = document.getElementById("chat-input");
+
+  if (bar) {
+    bar.style.display = "none";
+  }
+  if (input) {
+    input.placeholder = "Apa yang ingin kamu bahas?";
+  }
+}
 
 async function refreshAllProfilesCache() {
   const { data: profiles } = await supabaseClient
@@ -391,6 +586,8 @@ function setActiveNav(navId) {
 async function leaveChannelPresence() {
   isCurrentlyTyping = false;
   recentActiveSenders.clear();
+  closeMessageActionPopup();
+  cancelReply();
 
   if (typingTimeout) {
     clearTimeout(typingTimeout);
@@ -410,6 +607,7 @@ async function leaveChannelPresence() {
 }
 
 async function switchScreen(screenName) {
+  closeMobileSidebar();
   document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
   const screen = document.getElementById("screen-" + screenName);
   if (screen) screen.classList.add("active");
@@ -546,8 +744,13 @@ function renderInboxNotifications() {
 
 // 3. Membuka Channel & Mengaktifkan Presence (Online Count + Typing) & Chat Real-Time
 async function openChannel(channelId, channelName, channelCode, navId, avatarUrl = null) {
+  closeMobileSidebar();
+
   if (activeChannelId && activeChannelId !== channelId) {
     await leaveChannelPresence();
+  } else {
+    closeMessageActionPopup();
+    cancelReply();
   }
 
   activeChannelId = channelId;
@@ -806,6 +1009,14 @@ function formatMessagePreview(rawText) {
   return rawText;
 }
 
+function escapeHtmlSafe(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function renderSingleMessage(senderName, text, msgId = null, senderId = null, senderAvatarUrl = null) {
   if (msgId) {
     if (renderedMessageIds.has(msgId)) return;
@@ -837,7 +1048,12 @@ function renderSingleMessage(senderName, text, msgId = null, senderId = null, se
       </a>
     `;
   } else {
-    bodyHtml = `<div class="msg-text">${text}</div>`;
+    const replyMatch = text.match(/^(Replyed\s+[^:]+:\s*)(.*)$/s);
+    if (replyMatch) {
+      bodyHtml = `<div class="msg-text"><span class="msg-reply-tag">${escapeHtmlSafe(replyMatch[1])}</span>${escapeHtmlSafe(replyMatch[2])}</div>`;
+    } else {
+      bodyHtml = `<div class="msg-text">${escapeHtmlSafe(text)}</div>`;
+    }
   }
 
   const nameColor = getUserColor(senderName);
@@ -850,10 +1066,16 @@ function renderSingleMessage(senderName, text, msgId = null, senderId = null, se
   row.innerHTML = `
     <div class="avatar-circle" ${senderDataAttr} ${avatarStyle}></div>
     <div class="msg-content-box">
-      <div class="msg-meta" ${senderDataAttr} style="color: ${nameColor};">${senderName}</div>
+      <div class="msg-meta" ${senderDataAttr} style="color: ${nameColor};">${escapeHtmlSafe(senderName)}</div>
       ${bodyHtml}
     </div>
   `;
+
+  const boxEl = row.querySelector(".msg-content-box");
+  if (boxEl) {
+    attachLongPressHandlers(boxEl, senderName, text);
+  }
+
   container.appendChild(row);
   container.scrollTop = container.scrollHeight;
 }
@@ -866,12 +1088,17 @@ document.addEventListener("DOMContentLoaded", () => {
   chatForm.addEventListener("submit", async function (e) {
     e.preventDefault();
     const input = document.getElementById("chat-input");
-    const text = input.value.trim();
-    if (!text || !activeChannelId || !currentUserId) return;
+    const rawTypedText = input.value.trim();
+    if (!rawTypedText || !activeChannelId || !currentUserId) return;
+
+    const finalMessageText = replyingToUsername
+      ? `Replyed ${replyingToUsername} : ${rawTypedText}`
+      : rawTypedText;
 
     const targetChannelId = activeChannelId;
     const senderId = currentUserId;
     input.value = "";
+    cancelReply();
 
     if (isCurrentlyTyping && channelPresenceSubscription) {
       isCurrentlyTyping = false;
@@ -889,7 +1116,7 @@ document.addEventListener("DOMContentLoaded", () => {
         {
           channel_id: targetChannelId,
           sender_id: senderId,
-          content: text
+          content: finalMessageText
         }
       ]);
 
@@ -904,7 +1131,7 @@ async function createNewChannel() {
   const input = document.getElementById("channel-action-input");
   const name = input.value.trim();
   if (!name) {
-    alert("Masukkan nama channel terlebih dahulu, lalu klik tombol (+).");
+    alert("Masukkan nama channel terlebih dahulu, lalu klik tombol Buat (+).");
     input.focus();
     return;
   }
@@ -1102,7 +1329,6 @@ async function openChannelBio() {
   const dangerText = document.getElementById("btn-channel-danger-text");
   const bioAvatar = document.getElementById("bio-channel-avatar");
 
-  // Reset hak akses ke mode non-admin terlebih dahulu sebelum pengecekan database selesai
   editBox.style.display = "none";
   dangerText.textContent = "Keluar Channel";
   if (bioAvatar) {
@@ -1145,7 +1371,6 @@ async function openChannelBio() {
     document.getElementById("bio-edit-input").value = channelData.bio || "";
     dangerText.textContent = "Delete Channel";
 
-    // Hanya admin (pembuat channel) yang bisa klik foto profil tepat di atas nama channel
     if (bioAvatar) {
       bioAvatar.classList.add("editable-channel-avatar");
       bioAvatar.title = "Klik untuk mengganti foto profil channel";
@@ -1177,7 +1402,6 @@ async function uploadChannelAvatar(event) {
   }
 
   try {
-    // Pastikan sekali lagi bahwa user yang mengunggah benar-benar pembuat channel
     const { data: checkCh } = await supabaseClient
       .from("channels")
       .select("created_by")
