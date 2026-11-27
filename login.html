@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - NongkrongHub</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <section class="auth-page">
+    <div id="screen-welcome" class="screen-section active">
+        <p>Welcome to</p>
+        <div class="brand-logo">
+          <img src="logo.png" alt="NongHub Logo" class="brand-logo-img welcome-logo-img" />
+        </div>
+      </div>
+
+    <div class="login-card">
+      <h2 id="auth-title">Login</h2>
+
+      <form id="auth-form">
+        <div class="form-group">
+          <label for="username-input">Username</label>
+          <input type="text" id="username-input" placeholder="Masukan Username" required />
+        </div>
+
+        <div class="form-group">
+          <label for="password-input">Password</label>
+          <input type="password" id="password-input" placeholder="Masukan Password" required />
+          <a href="#" id="forgot-link" class="forgot-link">Lupa Password?</a>
+        </div>
+
+        <div class="terms-row">
+          <input type="checkbox" id="terms-check" checked required />
+          <label for="terms-check" class="terms-text">
+            <strong>Syarat & Ketentuan</strong>
+            <span>Saya menyetujui syarat & ketentuan yang berlaku</span>
+          </label>
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn-login">Login</button>
+      </form>
+
+      <div class="auth-switch">
+        <span id="auth-switch-text">Belum ada akun?</span>
+        <a id="auth-switch-link" onclick="toggleAuthMode()">Daftar Akun</a>
+      </div>
+    </div>
+  </section>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
