@@ -69,7 +69,16 @@ function getUserColor(username) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  let session = null;
+  try {
+    const res = await Promise.race([
+      supabaseClient.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+    ]);
+    session = res?.data?.session || null;
+  } catch (err) {
+    return;
+  }
   if (!session) return;
 
   currentUserId = session.user.id;
@@ -273,7 +282,8 @@ function cancelReply() {
 async function refreshAllProfilesCache() {
   const { data: profiles } = await supabaseClient
     .from("profiles")
-    .select("id, username, avatar_url");
+    .select("id, username, avatar_url")
+    .limit(200);
 
   if (profiles) {
     profiles.forEach(p => {
@@ -932,8 +942,6 @@ async function fetchChannelMessages(channelId) {
   const container = document.getElementById("chat-messages-area");
   container.innerHTML = '<div class="empty-state">Memuat pesan...</div>';
   renderedMessageIds.clear();
-
-  await refreshAllProfilesCache();
 
   const { data: messages, error } = await supabaseClient
     .from("messages")

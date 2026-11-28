@@ -1,15 +1,39 @@
 // js/auth.js
 let isRegisterMode = false;
 
+function withAuthTimeout(promise, ms = 8000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Koneksi ke server melebihi batas waktu (kemungkinan diblokir DNS operator seluler).")),
+        ms
+      )
+    )
+  ]);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (document.getElementById("auth-form")) {
+    setupAuthForm();
+  }
+
+  let session = null;
+  try {
+    const res = await withAuthTimeout(supabaseClient.auth.getSession(), 8000);
+    session = res?.data?.session || null;
+  } catch (err) {
+    alert(
+      "Gagal terhubung ke server NongkrongHub. Jika menggunakan paket data seluler, aktifkan DNS Pribadi (1.1.1.1 / dns.google) di pengaturan HP lalu muat ulang."
+    );
+    return;
+  }
 
   if (document.getElementById("auth-form")) {
     if (session) {
       window.location.href = "index.html";
       return;
     }
-    setupAuthForm();
   } else if (document.getElementById("display-profile-name")) {
     if (!session) {
       window.location.href = "login.html";
@@ -78,25 +102,31 @@ function setupAuthForm() {
 
     try {
       if (isRegisterMode) {
-        const { error: authError } = await supabaseClient.auth.signUp({
-          email: dummyEmail,
-          password: password,
-          options: {
-            data: {
-              username: rawUsername
+        const { error: authError } = await withAuthTimeout(
+          supabaseClient.auth.signUp({
+            email: dummyEmail,
+            password: password,
+            options: {
+              data: {
+                username: rawUsername
+              }
             }
-          }
-        });
+          }),
+          10000
+        );
 
         if (authError) throw authError;
 
         alert("Akun berhasil didaftarkan!");
         window.location.href = "index.html";
       } else {
-        const { error: loginError } = await supabaseClient.auth.signInWithPassword({
-          email: dummyEmail,
-          password: password
-        });
+        const { error: loginError } = await withAuthTimeout(
+          supabaseClient.auth.signInWithPassword({
+            email: dummyEmail,
+            password: password
+          }),
+          10000
+        );
 
         if (loginError) {
           const mauDaftar = confirm("Akun tidak ditemukan atau password salah. Ingin mendaftarkan akun baru?");
