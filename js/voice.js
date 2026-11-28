@@ -5,10 +5,12 @@ let voicePresenceChannel = null;
 let isMicMuted = false;
 let currentCallIsVideo = false;
 let audioMonitorInterval = null;
+let callRetryInterval = null;
 let audioContext = null;
 let myCurrentPeerId = null;
 
 const activePeerCalls = {};
+const connectedRemoteStreams = new Set();
 const callParticipants = {};
 
 const WAVE_SVG = `
@@ -39,38 +41,30 @@ const MIC_BADGE_SVG = `
   </svg>
 `;
 
-const DEFAULT_ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-  { urls: "stun:stun.cloudflare.com:3478" }
-];
-
-async function getDynamicIceConfig() {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
-    const res = await fetch(
-      "https://nonghub.metered.live/api/v1/turn/credentials?apiKey=e8dd65b92f6dde43c1e71001",
-      { signal: controller.signal }
-    );
-    clearTimeout(timer);
-    if (res.ok) {
-      const turnServers = await res.json();
-      if (Array.isArray(turnServers) && turnServers.length > 0) {
-        return {
-          iceServers: [...DEFAULT_ICE_SERVERS, ...turnServers],
-          iceCandidatePoolSize: 10
-        };
-      }
+// Kombinasi STUN + TURN OpenRelay (Port 80 & 443 TCP/UDP untuk menembus CGNAT operator seluler HP)
+const MOBILE_READY_ICE_CONFIG = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject"
     }
-  } catch (e) {}
-
-  return {
-    iceServers: DEFAULT_ICE_SERVERS,
-    iceCandidatePoolSize: 10
-  };
-}
+  ],
+  iceCandidatePoolSize: 10
+};
 
 async function startGroupCall(callType) {
   try {
@@ -115,7 +109,7 @@ async function startGroupCall(callType) {
       return;
     }
 
-    // Langsung tampilkan layar #screen-call segera setelah izin kamera/mic didapat
+    // Tampilkan layar #screen-call segera
     document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
     const callScreen = document.getElementById("screen-call");
     if (callScreen) callScreen.classList.add("active");
@@ -147,11 +141,9 @@ async function startGroupCall(callType) {
     renderCallParticipantsLayout();
     startAudioLevelMonitor();
 
-    const iceConfig = await getDynamicIceConfig();
-
     const peer = new Peer(myPeerId, {
       debug: 1,
-      config: iceConfig
+      config: MOBILE_READY_ICE_CONFIG
     });
     peerInstance = peer;
 
@@ -185,17 +177,20 @@ async function startGroupCall(callType) {
             callParticipants[remotePeerId].name = remoteName;
           }
 
-          const shouldInitiate = readyPeerId > remotePeerId;
-          if (shouldInitiate && !activePeerCalls[remotePeerId]) {
-            try {
-              const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
-                metadata: { username: myUsername }
-              });
-              if (outgoingCall) {
-                handleCallStream(outgoingCall, remoteName);
+          // Jika stream dari remotePeerId belum terhubung, lakukan panggilan (dengan anti-tabrakan)
+          if (!connectedRemoteStreams.has(remotePeerId)) {
+            const shouldInitiate = readyPeerId > remotePeerId;
+            if (shouldInitiate && !activePeerCalls[remotePeerId]) {
+              try {
+                const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
+                  metadata: { username: myUsername }
+                });
+                if (outgoingCall) {
+                  handleCallStream(outgoingCall, remoteName);
+                }
+              } catch (e) {
+                console.warn("Gagal memanggil peer:", remotePeerId, e);
               }
-            } catch (e) {
-              console.warn("Gagal memanggil peer:", remotePeerId, e);
             }
           }
         });
@@ -205,6 +200,7 @@ async function startGroupCall(callType) {
         .on("presence", { event: "sync" }, syncAndCallPeers)
         .on("presence", { event: "join" }, syncAndCallPeers)
         .on("presence", { event: "leave" }, ({ key }) => {
+          connectedRemoteStreams.delete(key);
           if (activePeerCalls[key]) {
             try {
               activePeerCalls[key].close();
@@ -222,7 +218,25 @@ async function startGroupCall(callType) {
               call_type: callType,
               joined_at: Date.now()
             });
-            setTimeout(syncAndCallPeers, 800);
+            setTimeout(syncAndCallPeers, 600);
+
+            // Auto-retry setiap 3.5 detik jika ada peserta di room yang stream-nya belum masuk
+            if (callRetryInterval) clearInterval(callRetryInterval);
+            callRetryInterval = setInterval(() => {
+              if (!voicePresenceChannel) return;
+              const state = voicePresenceChannel.presenceState();
+              Object.keys(state).forEach((remotePeerId) => {
+                if (remotePeerId !== readyPeerId && !connectedRemoteStreams.has(remotePeerId)) {
+                  if (activePeerCalls[remotePeerId]) {
+                    try {
+                      activePeerCalls[remotePeerId].close();
+                    } catch (e) {}
+                    delete activePeerCalls[remotePeerId];
+                  }
+                  syncAndCallPeers();
+                }
+              });
+            }, 3500);
           }
         });
     };
@@ -251,6 +265,7 @@ function handleCallStream(call, remoteName) {
     call.peerConnection.oniceconnectionstatechange = () => {
       const state = call.peerConnection?.iceConnectionState;
       if (state === "failed" || state === "disconnected") {
+        connectedRemoteStreams.delete(remoteId);
         try {
           if (typeof call.peerConnection.restartIce === "function") {
             call.peerConnection.restartIce();
@@ -261,17 +276,20 @@ function handleCallStream(call, remoteName) {
   }
 
   call.on("stream", (remoteStream) => {
+    connectedRemoteStreams.add(remoteId);
     registerParticipant(remoteId, remoteName, false, remoteStream);
     renderCallParticipantsLayout();
   });
 
   call.on("close", () => {
+    connectedRemoteStreams.delete(remoteId);
     delete activePeerCalls[remoteId];
     removeParticipant(remoteId);
   });
 
   call.on("error", (err) => {
     console.warn("Call stream error:", err);
+    connectedRemoteStreams.delete(remoteId);
     delete activePeerCalls[remoteId];
   });
 }
@@ -488,6 +506,13 @@ async function endGroupCall() {
     clearInterval(audioMonitorInterval);
     audioMonitorInterval = null;
   }
+
+  if (callRetryInterval) {
+    clearInterval(callRetryInterval);
+    callRetryInterval = null;
+  }
+
+  connectedRemoteStreams.clear();
 
   Object.keys(activePeerCalls).forEach((key) => {
     try {
