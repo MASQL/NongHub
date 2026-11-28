@@ -9,7 +9,7 @@ let audioContext = null;
 let myCurrentPeerId = null;
 
 const activePeerCalls = {};
-const callParticipants = {}; // { peerId: { name, isLocal, stream, analyser, dataArray } }
+const callParticipants = {};
 
 const WAVE_SVG = `
   <div class="voice-wave-visual">
@@ -46,11 +46,10 @@ const DEFAULT_ICE_SERVERS = [
   { urls: "stun:stun.cloudflare.com:3478" }
 ];
 
-// Ambil daftar ICE/TURN server aktif dengan timeout singkat agar panggilan tidak tertunda
 async function getDynamicIceConfig() {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    const timer = setTimeout(() => controller.abort(), 2500);
     const res = await fetch(
       "https://nonghub.metered.live/api/v1/turn/credentials?apiKey=e8dd65b92f6dde43c1e71001",
       { signal: controller.signal }
@@ -65,9 +64,7 @@ async function getDynamicIceConfig() {
         };
       }
     }
-  } catch (e) {
-    // Gunakan fallback STUN jika API TURN tidak terjangkau
-  }
+  } catch (e) {}
 
   return {
     iceServers: DEFAULT_ICE_SERVERS,
@@ -75,167 +72,181 @@ async function getDynamicIceConfig() {
   };
 }
 
-// Memulai Voice Call atau Video Call & Masuk ke Layar Call UI
 async function startGroupCall(callType) {
-  if (!activeChannelId) {
-    alert("Buka salah satu Channel terlebih dahulu sebelum memulai panggilan.");
-    return;
-  }
-
-  if (typeof Peer === "undefined") {
-    alert("Modul panggilan belum selesai dimuat. Tunggu 2 detik lalu coba tekan tombol panggilan lagi.");
-    return;
-  }
-
-  if (peerInstance) {
-    await endGroupCall();
-  }
-
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) return;
-
-  currentCallIsVideo = callType === "Video Call";
-
   try {
-    localMediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      video: currentCallIsVideo
-        ? {
-            facingMode: "user",
-            width: { ideal: 480, max: 640 },
-            height: { ideal: 360, max: 480 },
-            frameRate: { ideal: 20, max: 24 }
-          }
-        : false
-    });
-  } catch (err) {
-    alert("Gagal mengakses mikrofon/kamera. Pastikan izin di browser aktif: " + err.message);
-    return;
-  }
+    if (typeof activeChannelId === "undefined" || !activeChannelId) {
+      alert("Buka salah satu Channel terlebih dahulu sebelum memulai panggilan.");
+      return;
+    }
 
-  // Buka layar #screen-call sesuai UI/UX
-  document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
-  document.getElementById("screen-call").classList.add("active");
-  document.getElementById("call-room-title").textContent = `${activeChannelName} Voice Group`;
+    if (typeof Peer === "undefined") {
+      alert("Modul panggilan belum selesai dimuat. Tunggu 2 detik lalu coba tekan tombol panggilan lagi.");
+      return;
+    }
 
-  isMicMuted = false;
-  document.getElementById("btn-mute-toggle").classList.remove("muted");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Browser tidak mendukung akses kamera/mikrofon. Pastikan membuka halaman melalui HTTPS.");
+      return;
+    }
 
-  const myUsername = document.getElementById("display-profile-name")?.textContent || "You";
-  const myPeerId = `nh-${session.user.id.slice(0, 8)}-${Date.now()}`;
-  myCurrentPeerId = myPeerId;
+    if (peerInstance) {
+      await endGroupCall();
+    }
 
-  // Daftarkan diri sendiri sebagai peserta pertama (Layout-Call-Idle)
-  registerParticipant(myPeerId, "You", true, localMediaStream);
-  renderCallParticipantsLayout();
-  startAudioLevelMonitor();
+    currentCallIsVideo = callType === "Video Call";
 
-  const iceConfig = await getDynamicIceConfig();
-
-  // Inisialisasi PeerJS
-  const peer = new Peer(myPeerId, {
-    debug: 1,
-    config: iceConfig
-  });
-  peerInstance = peer;
-
-  // Terima panggilan masuk dari peserta lain di room
-  peer.on("call", (incomingCall) => {
-    if (!localMediaStream) return;
-    incomingCall.answer(localMediaStream);
-    const callerName = incomingCall.metadata?.username || "Teman";
-    handleCallStream(incomingCall, callerName);
-  });
-
-  // Hubungkan ke Supabase Realtime Presence untuk sinkronisasi peserta room
-  const connectToVoiceRoomPresence = async (readyPeerId) => {
-    if (voicePresenceChannel) return;
-
-    const roomTopic = `voice-room-${activeChannelId}`;
-    voicePresenceChannel = supabaseClient.channel(roomTopic, {
-      config: { presence: { key: readyPeerId } }
-    });
-
-    const syncAndCallPeers = () => {
-      if (!voicePresenceChannel || !peerInstance || peerInstance.disconnected) return;
-      const state = voicePresenceChannel.presenceState();
-      const peerIdsInRoom = Object.keys(state);
-
-      peerIdsInRoom.forEach((remotePeerId) => {
-        if (remotePeerId === readyPeerId) return;
-
-        const presenceInfo = state[remotePeerId]?.[state[remotePeerId].length - 1];
-        const remoteName = presenceInfo?.username || "Teman";
-
-        if (callParticipants[remotePeerId]) {
-          callParticipants[remotePeerId].name = remoteName;
-        }
-
-        // Hanya peer dengan ID leksikografis lebih besar yang menginisiasi call
-        const shouldInitiate = readyPeerId > remotePeerId;
-        if (shouldInitiate && !activePeerCalls[remotePeerId]) {
-          try {
-            const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
-              metadata: { username: myUsername }
-            });
-            if (outgoingCall) {
-              handleCallStream(outgoingCall, remoteName);
+    try {
+      localMediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: currentCallIsVideo
+          ? {
+              facingMode: "user",
+              width: { ideal: 480, max: 640 },
+              height: { ideal: 360, max: 480 }
             }
-          } catch (e) {
-            console.warn("Gagal memanggil peer:", remotePeerId, e);
-          }
-        }
+          : false
       });
+    } catch (err) {
+      alert("Gagal mengakses mikrofon/kamera. Pastikan izin di browser aktif: " + err.message);
+      return;
+    }
+
+    // Langsung tampilkan layar #screen-call segera setelah izin kamera/mic didapat
+    document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
+    const callScreen = document.getElementById("screen-call");
+    if (callScreen) callScreen.classList.add("active");
+
+    const titleEl = document.getElementById("call-room-title");
+    if (titleEl) {
+      const chTitle = typeof activeChannelName !== "undefined" && activeChannelName ? activeChannelName : "Channel";
+      titleEl.textContent = `${chTitle} Voice Group`;
+    }
+
+    isMicMuted = false;
+    const muteBtn = document.getElementById("btn-mute-toggle");
+    if (muteBtn) muteBtn.classList.remove("muted");
+
+    const userId =
+      (typeof currentUserId !== "undefined" && currentUserId) ||
+      sessionStorage.getItem("nh_user_id") ||
+      Math.random().toString(36).slice(2, 10);
+
+    const myUsername =
+      document.getElementById("display-profile-name")?.textContent ||
+      sessionStorage.getItem("nh_current_user") ||
+      "You";
+
+    const myPeerId = `nh-${String(userId).slice(0, 8)}-${Date.now()}`;
+    myCurrentPeerId = myPeerId;
+
+    registerParticipant(myPeerId, "You", true, localMediaStream);
+    renderCallParticipantsLayout();
+    startAudioLevelMonitor();
+
+    const iceConfig = await getDynamicIceConfig();
+
+    const peer = new Peer(myPeerId, {
+      debug: 1,
+      config: iceConfig
+    });
+    peerInstance = peer;
+
+    peer.on("call", (incomingCall) => {
+      if (!localMediaStream) return;
+      incomingCall.answer(localMediaStream);
+      const callerName = incomingCall.metadata?.username || "Teman";
+      handleCallStream(incomingCall, callerName);
+    });
+
+    const connectToVoiceRoomPresence = async (readyPeerId) => {
+      if (voicePresenceChannel) return;
+
+      const roomTopic = `voice-room-${activeChannelId}`;
+      voicePresenceChannel = supabaseClient.channel(roomTopic, {
+        config: { presence: { key: readyPeerId } }
+      });
+
+      const syncAndCallPeers = () => {
+        if (!voicePresenceChannel || !peerInstance || peerInstance.disconnected) return;
+        const state = voicePresenceChannel.presenceState();
+        const peerIdsInRoom = Object.keys(state);
+
+        peerIdsInRoom.forEach((remotePeerId) => {
+          if (remotePeerId === readyPeerId) return;
+
+          const presenceInfo = state[remotePeerId]?.[state[remotePeerId].length - 1];
+          const remoteName = presenceInfo?.username || "Teman";
+
+          if (callParticipants[remotePeerId]) {
+            callParticipants[remotePeerId].name = remoteName;
+          }
+
+          const shouldInitiate = readyPeerId > remotePeerId;
+          if (shouldInitiate && !activePeerCalls[remotePeerId]) {
+            try {
+              const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
+                metadata: { username: myUsername }
+              });
+              if (outgoingCall) {
+                handleCallStream(outgoingCall, remoteName);
+              }
+            } catch (e) {
+              console.warn("Gagal memanggil peer:", remotePeerId, e);
+            }
+          }
+        });
+      };
+
+      voicePresenceChannel
+        .on("presence", { event: "sync" }, syncAndCallPeers)
+        .on("presence", { event: "join" }, syncAndCallPeers)
+        .on("presence", { event: "leave" }, ({ key }) => {
+          if (activePeerCalls[key]) {
+            try {
+              activePeerCalls[key].close();
+            } catch (e) {}
+            delete activePeerCalls[key];
+          }
+          removeParticipant(key);
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await voicePresenceChannel.track({
+              peer_id: readyPeerId,
+              user_id: userId,
+              username: myUsername,
+              call_type: callType,
+              joined_at: Date.now()
+            });
+            setTimeout(syncAndCallPeers, 800);
+          }
+        });
     };
 
-    voicePresenceChannel
-      .on("presence", { event: "sync" }, syncAndCallPeers)
-      .on("presence", { event: "join" }, syncAndCallPeers)
-      .on("presence", { event: "leave" }, ({ key }) => {
-        if (activePeerCalls[key]) {
-          try {
-            activePeerCalls[key].close();
-          } catch (e) {}
-          delete activePeerCalls[key];
-        }
-        removeParticipant(key);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await voicePresenceChannel.track({
-            peer_id: readyPeerId,
-            user_id: session.user.id,
-            username: myUsername,
-            call_type: callType,
-            joined_at: Date.now()
-          });
-          setTimeout(syncAndCallPeers, 800);
-        }
+    if (peer.open) {
+      connectToVoiceRoomPresence(peer.id);
+    } else {
+      peer.on("open", (id) => {
+        connectToVoiceRoomPresence(id);
       });
-  };
+    }
 
-  if (peer.open) {
-    connectToVoiceRoomPresence(peer.id);
-  } else {
-    peer.on("open", (id) => {
-      connectToVoiceRoomPresence(id);
+    peer.on("error", (err) => {
+      console.error("PeerJS Error:", err.type, err);
     });
+  } catch (fatalErr) {
+    alert("Terjadi kesalahan saat memulai panggilan: " + fatalErr.message);
   }
-
-  peer.on("error", (err) => {
-    console.error("PeerJS Error:", err.type, err);
-  });
 }
 
 function handleCallStream(call, remoteName) {
   const remoteId = call.peer;
   activePeerCalls[remoteId] = call;
 
-  // Pantau koneksi ICE WebRTC untuk memulihkan video jika jalur NAT terputus
   if (call.peerConnection) {
     call.peerConnection.oniceconnectionstatechange = () => {
       const state = call.peerConnection?.iceConnectionState;
@@ -265,7 +276,6 @@ function handleCallStream(call, remoteName) {
   });
 }
 
-// Daftarkan peserta beserta analyser audio untuk deteksi bicara real-time
 function registerParticipant(peerId, name, isLocal, stream) {
   let analyser = null;
   let dataArray = null;
@@ -284,9 +294,7 @@ function registerParticipant(peerId, name, isLocal, stream) {
       source.connect(analyser);
       dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
-  } catch (e) {
-    console.warn("Audio analyser tidak aktif:", e);
-  }
+  } catch (e) {}
 
   callParticipants[peerId] = {
     peerId,
@@ -305,7 +313,6 @@ function removeParticipant(peerId) {
   renderCallParticipantsLayout();
 }
 
-// Render otomatis antara Layout-Call-Idle (1 user) dan Layout-Call-Grid (2+ user)
 function renderCallParticipantsLayout() {
   const list = Object.values(callParticipants);
   const idleView = document.getElementById("call-idle-view");
@@ -314,26 +321,24 @@ function renderCallParticipantsLayout() {
 
   if (!idleView || !gridView) return;
 
-  // Kondisi 1: Baru 1 user yang masuk -> Tampilkan Layout-Call-Idle
   if (list.length <= 1) {
     idleView.style.display = "flex";
     gridView.style.display = "none";
     gridView.innerHTML = "";
-    idleSlot.innerHTML = "";
-
-    if (list.length === 1) {
-      idleSlot.appendChild(createParticipantCardElement(list[0], 0));
+    if (idleSlot) {
+      idleSlot.innerHTML = "";
+      if (list.length === 1) {
+        idleSlot.appendChild(createParticipantCardElement(list[0], 0));
+      }
     }
     return;
   }
 
-  // Kondisi 2: Ada user lain yang bergabung -> Pindah ke Layout-Call Grid
   idleView.style.display = "none";
-  idleSlot.innerHTML = "";
+  if (idleSlot) idleSlot.innerHTML = "";
   gridView.style.display = "grid";
   gridView.innerHTML = "";
 
-  // Urutkan agar peserta lain tampil di atas dan "You" di posisi akhir seperti desain UI
   const sortedList = [
     ...list.filter(p => !p.isLocal),
     ...list.filter(p => p.isLocal)
@@ -348,12 +353,181 @@ function forcePlayMediaElement(mediaEl, isRemote) {
   const attemptPlay = () => {
     mediaEl.play().catch(() => {
       if (isRemote) {
-        // Jika browser mobile memblokir autoplay bersuara, mute sementara agar gambar video tetap tampil,
-        // lalu aktifkan suara begitu user menyentuh layar
         mediaEl.muted = true;
         mediaEl.play().catch(() => {});
         const unlockAudio = () => {
           mediaEl.muted = false;
           mediaEl.play().catch(() => {});
           document.removeEventListener("touchstart", unlockAudio);
-          document.
+          document.removeEventListener("click", unlockAudio);
+        };
+        document.addEventListener("touchstart", unlockAudio, { once: true });
+        document.addEventListener("click", unlockAudio, { once: true });
+      }
+    });
+  };
+
+  mediaEl.onloadedmetadata = attemptPlay;
+  attemptPlay();
+}
+
+function createParticipantCardElement(participant, index) {
+  const card = document.createElement("div");
+  const borderClass = index % 2 === 0 ? "border-magenta" : "border-cyan";
+  card.className = `participant-card ${borderClass}`;
+  card.id = `call-card-${participant.peerId}`;
+
+  const videoTracks = participant.stream ? participant.stream.getVideoTracks() : [];
+  const hasActiveVideo = videoTracks.length > 0 && videoTracks.some(t => t.readyState === "live");
+  const showVideoElement = (participant.isLocal && currentCallIsVideo) || (!participant.isLocal && hasActiveVideo);
+
+  if (showVideoElement && participant.stream) {
+    const videoEl = document.createElement("video");
+    videoEl.className = "participant-video";
+    videoEl.autoplay = true;
+    videoEl.playsInline = true;
+    videoEl.setAttribute("playsinline", "");
+    videoEl.setAttribute("webkit-playsinline", "");
+    videoEl.setAttribute("autoplay", "");
+
+    if (participant.isLocal) {
+      videoEl.muted = true;
+      videoEl.srcObject = participant.stream;
+    } else {
+      videoEl.muted = false;
+      videoEl.volume = 1.0;
+      videoEl.srcObject = participant.stream;
+    }
+
+    card.appendChild(videoEl);
+    forcePlayMediaElement(videoEl, !participant.isLocal);
+  } else {
+    card.insertAdjacentHTML("beforeend", WAVE_SVG);
+  }
+
+  if (!participant.isLocal && participant.stream && !showVideoElement) {
+    let audioEl = document.getElementById(`hidden-audio-${participant.peerId}`);
+    if (!audioEl) {
+      audioEl = document.createElement("audio");
+      audioEl.id = `hidden-audio-${participant.peerId}`;
+      audioEl.autoplay = true;
+      audioEl.setAttribute("autoplay", "");
+      audioEl.setAttribute("playsinline", "");
+      document.body.appendChild(audioEl);
+    }
+    audioEl.srcObject = participant.stream;
+    audioEl.volume = 1.0;
+    forcePlayMediaElement(audioEl, true);
+  }
+
+  card.insertAdjacentHTML(
+    "beforeend",
+    `
+      <div class="participant-info">
+        <span class="participant-name">${participant.name}</span>
+        <span class="participant-status">
+          <span class="status-dot"></span> online
+        </span>
+      </div>
+      <div class="participant-mic-badge" id="mic-badge-${participant.peerId}">
+        ${MIC_BADGE_SVG}
+      </div>
+    `
+  );
+
+  return card;
+}
+
+function startAudioLevelMonitor() {
+  if (audioMonitorInterval) clearInterval(audioMonitorInterval);
+
+  audioMonitorInterval = setInterval(() => {
+    Object.values(callParticipants).forEach((p) => {
+      const cardEl = document.getElementById(`call-card-${p.peerId}`);
+      if (!cardEl) return;
+
+      if (p.isLocal && isMicMuted) {
+        cardEl.classList.remove("speaking");
+        return;
+      }
+
+      if (p.analyser && p.dataArray) {
+        p.analyser.getByteFrequencyData(p.dataArray);
+        let sum = 0;
+        for (let i = 0; i < p.dataArray.length; i++) {
+          sum += p.dataArray[i];
+        }
+        const averageVolume = sum / p.dataArray.length;
+
+        if (averageVolume > 14) {
+          cardEl.classList.add("speaking");
+        } else {
+          cardEl.classList.remove("speaking");
+        }
+      }
+    });
+  }, 120);
+}
+
+function toggleMute() {
+  if (!localMediaStream) return;
+  isMicMuted = !isMicMuted;
+
+  localMediaStream.getAudioTracks().forEach((track) => {
+    track.enabled = !isMicMuted;
+  });
+
+  const btn = document.getElementById("btn-mute-toggle");
+  if (btn) {
+    btn.classList.toggle("muted", isMicMuted);
+  }
+}
+
+async function endGroupCall() {
+  if (audioMonitorInterval) {
+    clearInterval(audioMonitorInterval);
+    audioMonitorInterval = null;
+  }
+
+  Object.keys(activePeerCalls).forEach((key) => {
+    try {
+      activePeerCalls[key].close();
+    } catch (e) {}
+    delete activePeerCalls[key];
+  });
+
+  Object.keys(callParticipants).forEach((key) => {
+    const audioEl = document.getElementById(`hidden-audio-${key}`);
+    if (audioEl) audioEl.remove();
+    delete callParticipants[key];
+  });
+
+  if (voicePresenceChannel) {
+    try {
+      await voicePresenceChannel.untrack();
+    } catch (e) {}
+    await supabaseClient.removeChannel(voicePresenceChannel);
+    voicePresenceChannel = null;
+  }
+
+  if (peerInstance) {
+    try {
+      peerInstance.destroy();
+    } catch (e) {}
+    peerInstance = null;
+  }
+
+  if (localMediaStream) {
+    localMediaStream.getTracks().forEach((track) => track.stop());
+    localMediaStream = null;
+  }
+
+  myCurrentPeerId = null;
+
+  document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
+  document.getElementById("screen-chat").classList.add("active");
+}
+
+window.startGroupCall = startGroupCall;
+window.toggleMute = toggleMute;
+window.endGroupCall = endGroupCall;
