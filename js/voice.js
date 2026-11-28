@@ -6,6 +6,7 @@ let isMicMuted = false;
 let currentCallIsVideo = false;
 let audioMonitorInterval = null;
 let audioContext = null;
+let myCurrentPeerId = null;
 
 const activePeerCalls = {};
 const callParticipants = {}; // { peerId: { name, isLocal, stream, analyser, dataArray } }
@@ -38,10 +39,51 @@ const MIC_BADGE_SVG = `
   </svg>
 `;
 
+const DEFAULT_ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" }
+];
+
+// Ambil daftar ICE/TURN server aktif dengan timeout singkat agar panggilan tidak tertunda
+async function getDynamicIceConfig() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(
+      "https://nonghub.metered.live/api/v1/turn/credentials?apiKey=e8dd65b92f6dde43c1e71001",
+      { signal: controller.signal }
+    );
+    clearTimeout(timer);
+    if (res.ok) {
+      const turnServers = await res.json();
+      if (Array.isArray(turnServers) && turnServers.length > 0) {
+        return {
+          iceServers: [...DEFAULT_ICE_SERVERS, ...turnServers],
+          iceCandidatePoolSize: 10
+        };
+      }
+    }
+  } catch (e) {
+    // Gunakan fallback STUN jika API TURN tidak terjangkau
+  }
+
+  return {
+    iceServers: DEFAULT_ICE_SERVERS,
+    iceCandidatePoolSize: 10
+  };
+}
+
 // Memulai Voice Call atau Video Call & Masuk ke Layar Call UI
 async function startGroupCall(callType) {
   if (!activeChannelId) {
     alert("Buka salah satu Channel terlebih dahulu sebelum memulai panggilan.");
+    return;
+  }
+
+  if (typeof Peer === "undefined") {
+    alert("Modul panggilan belum selesai dimuat. Tunggu 2 detik lalu coba tekan tombol panggilan lagi.");
     return;
   }
 
@@ -56,8 +98,19 @@ async function startGroupCall(callType) {
 
   try {
     localMediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
       video: currentCallIsVideo
+        ? {
+            facingMode: "user",
+            width: { ideal: 480, max: 640 },
+            height: { ideal: 360, max: 480 },
+            frameRate: { ideal: 20, max: 24 }
+          }
+        : false
     });
   } catch (err) {
     alert("Gagal mengakses mikrofon/kamera. Pastikan izin di browser aktif: " + err.message);
@@ -74,60 +127,79 @@ async function startGroupCall(callType) {
 
   const myUsername = document.getElementById("display-profile-name")?.textContent || "You";
   const myPeerId = `nh-${session.user.id.slice(0, 8)}-${Date.now()}`;
+  myCurrentPeerId = myPeerId;
 
   // Daftarkan diri sendiri sebagai peserta pertama (Layout-Call-Idle)
   registerParticipant(myPeerId, "You", true, localMediaStream);
   renderCallParticipantsLayout();
   startAudioLevelMonitor();
 
-  peerInstance = new Peer(myPeerId, {
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
-      ]
-    }
-  });
+  const iceConfig = await getDynamicIceConfig();
 
-  peerInstance.on("call", (incomingCall) => {
+  // Inisialisasi PeerJS
+  const peer = new Peer(myPeerId, {
+    debug: 1,
+    config: iceConfig
+  });
+  peerInstance = peer;
+
+  // Terima panggilan masuk dari peserta lain di room
+  peer.on("call", (incomingCall) => {
+    if (!localMediaStream) return;
     incomingCall.answer(localMediaStream);
     const callerName = incomingCall.metadata?.username || "Teman";
     handleCallStream(incomingCall, callerName);
   });
 
-  peerInstance.on("open", async (id) => {
+  // Hubungkan ke Supabase Realtime Presence untuk sinkronisasi peserta room
+  const connectToVoiceRoomPresence = async (readyPeerId) => {
+    if (voicePresenceChannel) return;
+
     const roomTopic = `voice-room-${activeChannelId}`;
     voicePresenceChannel = supabaseClient.channel(roomTopic, {
-      config: { presence: { key: id } }
+      config: { presence: { key: readyPeerId } }
     });
 
-    voicePresenceChannel
-      .on("presence", { event: "sync" }, () => {
-        const state = voicePresenceChannel.presenceState();
-        const peerIdsInRoom = Object.keys(state);
+    const syncAndCallPeers = () => {
+      if (!voicePresenceChannel || !peerInstance || peerInstance.disconnected) return;
+      const state = voicePresenceChannel.presenceState();
+      const peerIdsInRoom = Object.keys(state);
 
-        peerIdsInRoom.forEach((remotePeerId) => {
-          const presenceInfo = state[remotePeerId]?.[0];
-          const remoteName = presenceInfo?.username || "Teman";
+      peerIdsInRoom.forEach((remotePeerId) => {
+        if (remotePeerId === readyPeerId) return;
 
-          if (remotePeerId !== id) {
-            if (callParticipants[remotePeerId]) {
-              callParticipants[remotePeerId].name = remoteName;
+        const presenceInfo = state[remotePeerId]?.[state[remotePeerId].length - 1];
+        const remoteName = presenceInfo?.username || "Teman";
+
+        if (callParticipants[remotePeerId]) {
+          callParticipants[remotePeerId].name = remoteName;
+        }
+
+        // Hanya peer dengan ID leksikografis lebih besar yang menginisiasi call
+        const shouldInitiate = readyPeerId > remotePeerId;
+        if (shouldInitiate && !activePeerCalls[remotePeerId]) {
+          try {
+            const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
+              metadata: { username: myUsername }
+            });
+            if (outgoingCall) {
+              handleCallStream(outgoingCall, remoteName);
             }
-            if (!activePeerCalls[remotePeerId]) {
-              const outgoingCall = peerInstance.call(remotePeerId, localMediaStream, {
-                metadata: { username: myUsername }
-              });
-              if (outgoingCall) {
-                handleCallStream(outgoingCall, remoteName);
-              }
-            }
+          } catch (e) {
+            console.warn("Gagal memanggil peer:", remotePeerId, e);
           }
-        });
-      })
+        }
+      });
+    };
+
+    voicePresenceChannel
+      .on("presence", { event: "sync" }, syncAndCallPeers)
+      .on("presence", { event: "join" }, syncAndCallPeers)
       .on("presence", { event: "leave" }, ({ key }) => {
         if (activePeerCalls[key]) {
-          activePeerCalls[key].close();
+          try {
+            activePeerCalls[key].close();
+          } catch (e) {}
           delete activePeerCalls[key];
         }
         removeParticipant(key);
@@ -135,23 +207,47 @@ async function startGroupCall(callType) {
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await voicePresenceChannel.track({
-            peer_id: id,
+            peer_id: readyPeerId,
             user_id: session.user.id,
             username: myUsername,
-            call_type: callType
+            call_type: callType,
+            joined_at: Date.now()
           });
+          setTimeout(syncAndCallPeers, 800);
         }
       });
-  });
+  };
 
-  peerInstance.on("error", (err) => {
-    console.error("PeerJS Error:", err);
+  if (peer.open) {
+    connectToVoiceRoomPresence(peer.id);
+  } else {
+    peer.on("open", (id) => {
+      connectToVoiceRoomPresence(id);
+    });
+  }
+
+  peer.on("error", (err) => {
+    console.error("PeerJS Error:", err.type, err);
   });
 }
 
 function handleCallStream(call, remoteName) {
   const remoteId = call.peer;
   activePeerCalls[remoteId] = call;
+
+  // Pantau koneksi ICE WebRTC untuk memulihkan video jika jalur NAT terputus
+  if (call.peerConnection) {
+    call.peerConnection.oniceconnectionstatechange = () => {
+      const state = call.peerConnection?.iceConnectionState;
+      if (state === "failed" || state === "disconnected") {
+        try {
+          if (typeof call.peerConnection.restartIce === "function") {
+            call.peerConnection.restartIce();
+          }
+        } catch (e) {}
+      }
+    };
+  }
 
   call.on("stream", (remoteStream) => {
     registerParticipant(remoteId, remoteName, false, remoteStream);
@@ -161,6 +257,11 @@ function handleCallStream(call, remoteName) {
   call.on("close", () => {
     delete activePeerCalls[remoteId];
     removeParticipant(remoteId);
+  });
+
+  call.on("error", (err) => {
+    console.warn("Call stream error:", err);
+    delete activePeerCalls[remoteId];
   });
 }
 
@@ -243,136 +344,16 @@ function renderCallParticipantsLayout() {
   });
 }
 
-function createParticipantCardElement(participant, index) {
-  const card = document.createElement("div");
-  const borderClass = index % 2 === 0 ? "border-magenta" : "border-cyan";
-  card.className = `participant-card ${borderClass}`;
-  card.id = `call-card-${participant.peerId}`;
-
-  const hasVideo = currentCallIsVideo || (participant.stream && participant.stream.getVideoTracks().length > 0);
-
-  if (hasVideo && participant.stream) {
-    const videoEl = document.createElement("video");
-    videoEl.className = "participant-video";
-    videoEl.srcObject = participant.stream;
-    videoEl.autoplay = true;
-    videoEl.playsInline = true;
-    if (participant.isLocal) videoEl.muted = true;
-    card.appendChild(videoEl);
-  } else {
-    card.insertAdjacentHTML("beforeend", WAVE_SVG);
-    // Putar audio peserta remote lewat elemen <audio> tersembunyi
-    if (!participant.isLocal && participant.stream) {
-      let audioEl = document.getElementById(`hidden-audio-${participant.peerId}`);
-      if (!audioEl) {
-        audioEl = document.createElement("audio");
-        audioEl.id = `hidden-audio-${participant.peerId}`;
-        audioEl.autoplay = true;
-        document.body.appendChild(audioEl);
-      }
-      audioEl.srcObject = participant.stream;
-    }
-  }
-
-  card.insertAdjacentHTML(
-    "beforeend",
-    `
-      <div class="participant-info">
-        <span class="participant-name">${participant.name}</span>
-        <span class="participant-status">
-          <span class="status-dot"></span> online
-        </span>
-      </div>
-      <div class="participant-mic-badge" id="mic-badge-${participant.peerId}">
-        ${MIC_BADGE_SVG}
-      </div>
-    `
-  );
-
-  return card;
-}
-
-// Pantau suara setiap peserta: Jika terdeteksi bicara -> card membesar & mic berubah hijau
-function startAudioLevelMonitor() {
-  if (audioMonitorInterval) clearInterval(audioMonitorInterval);
-
-  audioMonitorInterval = setInterval(() => {
-    Object.values(callParticipants).forEach((p) => {
-      const cardEl = document.getElementById(`call-card-${p.peerId}`);
-      if (!cardEl) return;
-
-      if (p.isLocal && isMicMuted) {
-        cardEl.classList.remove("speaking");
-        return;
-      }
-
-      if (p.analyser && p.dataArray) {
-        p.analyser.getByteFrequencyData(p.dataArray);
-        let sum = 0;
-        for (let i = 0; i < p.dataArray.length; i++) {
-          sum += p.dataArray[i];
-        }
-        const averageVolume = sum / p.dataArray.length;
-
-        if (averageVolume > 14) {
-          cardEl.classList.add("speaking");
-        } else {
-          cardEl.classList.remove("speaking");
-        }
-      }
-    });
-  }, 120);
-}
-
-// Mute / Unmute Mikrofon dari Bar Kontrol Bawah
-function toggleMute() {
-  if (!localMediaStream) return;
-  isMicMuted = !isMicMuted;
-
-  localMediaStream.getAudioTracks().forEach((track) => {
-    track.enabled = !isMicMuted;
-  });
-
-  const btn = document.getElementById("btn-mute-toggle");
-  if (btn) {
-    btn.classList.toggle("muted", isMicMuted);
-  }
-}
-
-// Keluar dari Panggilan & Kembali ke Layar Chat Channel
-async function endGroupCall() {
-  if (audioMonitorInterval) {
-    clearInterval(audioMonitorInterval);
-    audioMonitorInterval = null;
-  }
-
-  Object.keys(activePeerCalls).forEach((key) => {
-    activePeerCalls[key].close();
-    delete activePeerCalls[key];
-  });
-
-  Object.keys(callParticipants).forEach((key) => {
-    const audioEl = document.getElementById(`hidden-audio-${key}`);
-    if (audioEl) audioEl.remove();
-    delete callParticipants[key];
-  });
-
-  if (voicePresenceChannel) {
-    await supabaseClient.removeChannel(voicePresenceChannel);
-    voicePresenceChannel = null;
-  }
-
-  if (peerInstance) {
-    peerInstance.destroy();
-    peerInstance = null;
-  }
-
-  if (localMediaStream) {
-    localMediaStream.getTracks().forEach((track) => track.stop());
-    localMediaStream = null;
-  }
-
-  // Kembalikan tampilan ke halaman chat channel aktif
-  document.querySelectorAll(".screen-section").forEach(sec => sec.classList.remove("active"));
-  document.getElementById("screen-chat").classList.add("active");
-}
+function forcePlayMediaElement(mediaEl, isRemote) {
+  const attemptPlay = () => {
+    mediaEl.play().catch(() => {
+      if (isRemote) {
+        // Jika browser mobile memblokir autoplay bersuara, mute sementara agar gambar video tetap tampil,
+        // lalu aktifkan suara begitu user menyentuh layar
+        mediaEl.muted = true;
+        mediaEl.play().catch(() => {});
+        const unlockAudio = () => {
+          mediaEl.muted = false;
+          mediaEl.play().catch(() => {});
+          document.removeEventListener("touchstart", unlockAudio);
+          document.
